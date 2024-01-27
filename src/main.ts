@@ -84,33 +84,23 @@ function crossOut(
   columnIndex: number,
   rowIndex: number,
   color: string,
-  //animationOptions: number | KeyframeAnimationOptions = 500
 ) {
   const { x, y } = centers[columnIndex][rowIndex];
-  const offsetFromCenter = fontSize / 2;
-  const lineElement = document.createElementNS(
+  const length = fontSize;
+  const width = fontSize / 9;
+  const rectElement = document.createElementNS(
     "http://www.w3.org/2000/svg",
-    "line"
+    "rect"
   );
-  lineElement.x1.baseVal.value = offsetFromCenter;
-  lineElement.y1.baseVal.value = 0;
-  lineElement.x2.baseVal.value = -offsetFromCenter;
-  lineElement.y2.baseVal.value = 0;
-  lineElement.style.stroke = color;
-  lineElement.style.transform = `translate(${x}px,${y}px)  rotate(-45deg)`;
-  lineElement.style.strokeWidth = (fontSize / 10).toString();
-  lineElement.style.strokeDasharray = fontSize.toString();
-//  lineElement.style.filter="url(#shadow)";
-  lettersGElement.appendChild(lineElement);
-  /*
-  if (animationOptions) {
-    return lineElement.animate(
-      [{ strokeDashoffset: fontSize }, { strokeDashoffset: 0 }],
-      animationOptions
-    ).finished;
-  } else {
-    return Promise.resolve();
-  }*/
+  rectElement.x.baseVal.value = -width/2;
+  rectElement.y.baseVal.value = -length/2;
+  rectElement.width.baseVal.value = width;
+  rectElement.height.baseVal.value = length;
+  rectElement.style.fill = color;
+  rectElement.style.strokeWidth = (fontSize / 30).toString();
+  rectElement.style.stroke = "white";
+  rectElement.style.transform = `translate(${x}px,${y}px)  rotate(-45deg)`;
+  lettersGElement.appendChild(rectElement);
 }
 
 (window as any).crossOut = crossOut;
