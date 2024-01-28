@@ -1,3 +1,4 @@
+import { sleep } from "phil-lib/misc";
 import "./style.css";
 import { getById } from "phil-lib/client-misc";
 
@@ -146,3 +147,70 @@ function replace(
 }
 
 (window as any).replace = replace;
+
+type ReplaceOneCell = {
+  rowIndex: number;
+  newText?: string;
+};
+
+/**
+ *
+ * @param cells Index 0 maps to the root of the tree.  Index 1 maps to one column left of the root.
+ */
+async function replaceOneValue(
+  cells: readonly ReplaceOneCell[],
+  color: string
+) {
+  let columnIndex = columnCount;
+  const overWrite: {
+    rowIndex: number;
+    columnIndex: number;
+    newText: string;
+  }[] = [];
+  for (const { rowIndex, newText } of cells) {
+    columnIndex--;
+    const iteration = currentIteration[columnIndex][rowIndex]++;
+    crossOut(getCenter(columnIndex, rowIndex, iteration), color);
+    if (newText) {
+      overWrite.unshift({ rowIndex, columnIndex, newText });
+    }
+    await sleep(1000);
+  }
+  for (; columnIndex < columnCount; columnIndex++) {
+    if (columnIndex < columnCount) {
+      for (const { rowIndex, columnIndex, newText } of overWrite) {
+        addLetter(
+          getCenter(
+            columnIndex,
+            rowIndex,
+            currentIteration[columnIndex][rowIndex]
+          ),
+          newText,
+          color
+        );
+        await sleep(1000);
+      }
+    }
+  }
+}
+
+(window as any).replaceOneValue = replaceOneValue;
+
+await replaceOneValue(
+  [
+    { rowIndex: 0, newText: "B" },
+    { rowIndex: 0, newText: "B" },
+    { rowIndex: 0, newText: "Z" },
+    { rowIndex: 0 },
+  ],
+  "hotpink"
+);
+await replaceOneValue(
+  [
+    { rowIndex: 0, newText: "D" },
+    { rowIndex: 0, newText: "Q" },
+    { rowIndex: 1, newText: "Q" },
+    { rowIndex: 3 },
+  ],
+  "lightblue"
+);
