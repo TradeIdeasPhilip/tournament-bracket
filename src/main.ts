@@ -1,6 +1,25 @@
-import { sleep } from "phil-lib/misc";
+import { makePromise } from "phil-lib/misc";
 import "./style.css";
 import { getById } from "phil-lib/client-misc";
+import ffmpeg from "ffmpeg.js";
+
+{
+  let stdout = "";
+  let stderr = "";
+  ffmpeg({
+    arguments: ["-version"],
+    print: function (data) {
+      stdout += data + "\n";
+    },
+    printErr: function (data) {
+      stderr += data + "\n";
+    },
+    onExit: function (code) {
+      console.log("Process exited with code " + code);
+      console.log({ stdout, stderr });
+    },
+  });
+}
 
 const svg = getById("main", SVGSVGElement);
 const width = 1080;
@@ -153,6 +172,30 @@ type ReplaceOneCell = {
   newText?: string;
 };
 
+function takePhoto(timeMs: number) {
+  console.log(`takePhoto(${timeMs})`);
+
+  {
+    // https://stackoverflow.com/questions/69672178/when-converting-an-svg-to-png-in-the-browser-using-canvas-api-embedded-image-in
+    const imgElement = getById("img", HTMLImageElement);
+    imgElement.src = URL.createObjectURL(
+      new Blob([svg.outerHTML], { type: "image/svg+xml" })
+    );
+  }
+  const { promise, resolve } = makePromise();
+  const continueButton = getById("continue", HTMLButtonElement);
+  continueButton.disabled = false;
+  continueButton.addEventListener(
+    "click",
+    () => {
+      continueButton.disabled = true;
+      resolve();
+    },
+    { once: true }
+  );
+  return promise;
+}
+
 /**
  *
  * @param cells Index 0 maps to the root of the tree.  Index 1 maps to one column left of the root.
@@ -174,7 +217,7 @@ async function replaceOneValue(
     if (newText) {
       overWrite.unshift({ rowIndex, columnIndex, newText });
     }
-    await sleep(1000);
+    await takePhoto(1000);
   }
   for (; columnIndex < columnCount; columnIndex++) {
     if (columnIndex < columnCount) {
@@ -188,7 +231,7 @@ async function replaceOneValue(
           newText,
           color
         );
-        await sleep(1000);
+        await takePhoto(1000);
       }
     }
   }
@@ -214,3 +257,5 @@ await replaceOneValue(
   ],
   "lightblue"
 );
+
+//ffmpeg({});
