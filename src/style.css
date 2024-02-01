@@ -1,10 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Croissant+One&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Croissant+One&display=swap");
 
 :root {
-  font-family: 'Croissant One', serif;
+  font-family: "Croissant One", serif;
   background-color: #bcbcbc;
 }
-
 
 body {
   margin: 0;
@@ -23,4 +22,10 @@ text {
 line {
   stroke: black;
   stroke-width: 10px;
+}
+
+canvas#main {
+  max-height: 100vmin;
+  max-width: 100vmin;
+  background-color: white;
 }

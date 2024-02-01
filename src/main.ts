@@ -1,4 +1,4 @@
-import { makePromise } from "phil-lib/misc";
+import { count, makePromise, sleep, zip } from "phil-lib/misc";
 import "./style.css";
 import { getById } from "phil-lib/client-misc";
 import ffmpeg from "ffmpeg.js";
@@ -21,9 +21,20 @@ import ffmpeg from "ffmpeg.js";
   });
 }
 
-const svg = getById("main", SVGSVGElement);
 const width = 1080;
 const height = 1920;
+const fontSize = 75;
+
+const canvas = getById("main", HTMLCanvasElement);
+canvas.width = width;
+canvas.height = height;
+const context = canvas.getContext("2d")!;
+context.font = `${fontSize}px "Croissant One"`;
+context.textAlign = "center";
+context.textBaseline = "middle";
+context.textRendering = "optimizeLegibility";
+context.fillStyle = "white";
+context.fillRect(0, 0, width, height);
 
 const connectingLinesGElement = getById("connectingLines", SVGGElement);
 const lettersGElement = getById("letters", SVGGElement);
@@ -37,14 +48,12 @@ const initialContents = [
 const currentIteration = initialContents.map((column) => column.map(() => 0));
 const columnCount = initialContents.length;
 const lineWidth = width / columnCount / 25;
-const fontSize = 75;
 
 const centers = initialContents.map((columnValues, columnIndex) => {
   const x = (width / columnCount) * (columnIndex + 0.5);
-  return columnValues.map((text, rowIndex) => {
+  return columnValues.map((_, rowIndex) => {
     const y = (height / columnValues.length) * (rowIndex + 0.5);
     const center = { x, y };
-    addLetter(center, text, "black");
     return center;
   });
 });
@@ -65,40 +74,59 @@ function getCenter(columnIndex: number, rowIndex: number, iteration = 0) {
   }
 }
 
-centers.forEach((column, columnIndex) => {
-  const nextColumn = centers[columnIndex + 1];
-  if (nextColumn) {
-    column.forEach((initialPosition, initialRowIndex) => {
-      const finalRowIndex = (initialRowIndex / 2) | 0;
-      const finalPosition = nextColumn[finalRowIndex];
-      const line = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "line"
-      );
-      line.x1.baseVal.value = initialPosition.x;
-      line.y1.baseVal.value = initialPosition.y;
-      line.x2.baseVal.value = finalPosition.x;
-      line.y2.baseVal.value = finalPosition.y;
-      connectingLinesGElement.appendChild(line);
-    });
-  }
-});
+function drawBracket() {
+  // Lines for the bracket.
+  context.strokeStyle = "black";
+  centers.forEach((column, columnIndex) => {
+    const nextColumn = centers[columnIndex + 1];
+    if (nextColumn) {
+      column.forEach((initialPosition, initialRowIndex) => {
+        const finalRowIndex = (initialRowIndex / 2) | 0;
+        const finalPosition = nextColumn[finalRowIndex];
+        // SVG
+        const line = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "line"
+        );
+        line.x1.baseVal.value = initialPosition.x;
+        line.y1.baseVal.value = initialPosition.y;
+        line.x2.baseVal.value = finalPosition.x;
+        line.y2.baseVal.value = finalPosition.y;
+        connectingLinesGElement.appendChild(line);
+        // Canvas
+        context.moveTo(initialPosition.x, initialPosition.y);
+        context.lineTo(finalPosition.x, finalPosition.y);
+        context.lineWidth = 10;
+        context.stroke();
+      });
+    }
+  });
 
-centers.flat().forEach(({ x, y }) => {
-  const circleElement = document.createElementNS(
-    "http://www.w3.org/2000/svg",
-    "circle"
-  );
-  circleElement.cx.baseVal.value = x;
-  circleElement.cy.baseVal.value = y;
-  circleElement.r.baseVal.value = width / columnCount / 4;
-  circleElement.style.fill = "white";
-  circleElement.style.stroke = "none";
-  circleElement.style.strokeWidth = lineWidth + "px";
-  connectingLinesGElement.appendChild(circleElement);
-});
+  // Empty space to fill in later with the letters.
+  context.fillStyle = "white";
+  const radius = width / columnCount / 5;
+  centers.flat().forEach(({ x, y }) => {
+    // SVG
+    const circleElement = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "circle"
+    );
+    circleElement.cx.baseVal.value = x;
+    circleElement.cy.baseVal.value = y;
+    circleElement.r.baseVal.value = radius;
+    circleElement.style.fill = "white";
+    circleElement.style.stroke = "none";
+    circleElement.style.strokeWidth = lineWidth + "px";
+    connectingLinesGElement.appendChild(circleElement);
+    // Canvas
+    context.beginPath();
+    context.ellipse(x, y, radius, radius, 0, 0, 2 * Math.PI);
+    context.fill();
+  });
+}
 
 function crossOut(center: { x: number; y: number }, color: string) {
+  console.log({ crossOut: 1, center, color });
   const { x, y } = center;
   const length = fontSize;
   const width = fontSize / 9;
@@ -115,22 +143,25 @@ function crossOut(center: { x: number; y: number }, color: string) {
   rectElement.style.stroke = "white";
   rectElement.style.transform = `translate(${x}px,${y}px)  rotate(-45deg)`;
   lettersGElement.appendChild(rectElement);
+  // Canvas
+  const offset = fontSize * 0.4;
+  context.beginPath();
+  context.moveTo(x - offset, y - offset);
+  context.lineTo(x + offset, y + offset);
+  context.lineWidth = 12;
+  context.strokeStyle = "white";
+  context.stroke();
+  context.lineWidth = 6.1;
+  context.strokeStyle = color;
+  context.stroke();
 }
-
-//(window as any).crossOut = crossOut;
-//for (let i = 3; i >= 0; i--) {await crossOut(i, 0, "red");}
-
-/*
-for (let i = 3; i >= 0; i--) {
-  crossOut(getCenter(i, 0), "red");
-}
-*/
 
 function addLetter(
   center: { x: number; y: number },
   text: string,
   color: string
 ) {
+  console.log({ addLetter: 1, center, text, color });
   const textElement = document.createElementNS(
     "http://www.w3.org/2000/svg",
     "text"
@@ -140,48 +171,19 @@ function addLetter(
   textElement.setAttribute("y", center.y.toString());
   textElement.style.fill = color;
   lettersGElement.appendChild(textElement);
-}
 
-/**
- * This function is great for quick prototyping and development.
- * However, it will probably get split up soon.
- * The animation will start by crossing out the value at the root.
- * Then it will cross out the value of one of root's children.
- * And it will keep moving left and crossing out values.
- * Then it will fill in the new values going in the other direction.
- * @param columnIndex
- * @param rowIndex
- * @param text
- * @param color
- */
-function replace(
-  columnIndex: number,
-  rowIndex: number,
-  text: string,
-  color: string
-) {
-  const newIteration = ++currentIteration[columnIndex][rowIndex];
-  crossOut(getCenter(columnIndex, rowIndex, newIteration - 1), color);
-  addLetter(getCenter(columnIndex, rowIndex, newIteration), text, color);
+  // canvas
+  context.fillStyle = color;
+  context.fillText(text, center.x, center.y);
 }
-
-(window as any).replace = replace;
 
 type ReplaceOneCell = {
   rowIndex: number;
   newText?: string;
 };
 
-function takePhoto(timeMs: number) {
+function takePhoto(timeMs?: number) {
   console.log(`takePhoto(${timeMs})`);
-
-  {
-    // https://stackoverflow.com/questions/69672178/when-converting-an-svg-to-png-in-the-browser-using-canvas-api-embedded-image-in
-    const imgElement = getById("img", HTMLImageElement);
-    imgElement.src = URL.createObjectURL(
-      new Blob([svg.outerHTML], { type: "image/svg+xml" })
-    );
-  }
   const { promise, resolve } = makePromise();
   const continueButton = getById("continue", HTMLButtonElement);
   continueButton.disabled = false;
@@ -219,25 +221,36 @@ async function replaceOneValue(
     }
     await takePhoto(1000);
   }
-  for (; columnIndex < columnCount; columnIndex++) {
-    if (columnIndex < columnCount) {
-      for (const { rowIndex, columnIndex, newText } of overWrite) {
-        addLetter(
-          getCenter(
-            columnIndex,
-            rowIndex,
-            currentIteration[columnIndex][rowIndex]
-          ),
-          newText,
-          color
-        );
-        await takePhoto(1000);
-      }
-    }
+  for (const { rowIndex, columnIndex, newText } of overWrite) {
+    addLetter(
+      getCenter(columnIndex, rowIndex, currentIteration[columnIndex][rowIndex]),
+      newText,
+      color
+    );
+    await takePhoto(1000);
   }
 }
 
 (window as any).replaceOneValue = replaceOneValue;
+
+function drawInitialLetters(columnIndex: number) {
+  for (const [center, text] of zip(
+    centers[columnIndex],
+    initialContents[columnIndex]
+  )) {
+    addLetter(center, text, "black");
+  }
+}
+
+await sleep(1000);
+
+drawInitialLetters(0);
+await takePhoto();
+drawBracket();
+for (const columnIndex of count(0, columnCount)) {
+  drawInitialLetters(columnIndex);
+  await takePhoto();
+}
 
 await replaceOneValue(
   [
