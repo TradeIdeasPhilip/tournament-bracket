@@ -13,17 +13,6 @@ body {
   min-height: 100vh;
 }
 
-text {
-  font-size: 75px;
-  dominant-baseline: middle;
-  text-anchor: middle;
-}
-
-line {
-  stroke: black;
-  stroke-width: 10px;
-}
-
 canvas#main {
   max-height: 100vmin;
   max-width: 100vmin;

@@ -1,29 +1,11 @@
 import { count, makePromise, sleep, zip } from "phil-lib/misc";
 import "./style.css";
 import { getById } from "phil-lib/client-misc";
-import ffmpeg from "ffmpeg.js";
-
-{
-  let stdout = "";
-  let stderr = "";
-  ffmpeg({
-    arguments: ["-version"],
-    print: function (data) {
-      stdout += data + "\n";
-    },
-    printErr: function (data) {
-      stderr += data + "\n";
-    },
-    onExit: function (code) {
-      console.log("Process exited with code " + code);
-      console.log({ stdout, stderr });
-    },
-  });
-}
 
 const width = 1080;
 const height = 1920;
 const fontSize = 75;
+const backgroundColor = "white";
 
 const canvas = getById("main", HTMLCanvasElement);
 canvas.width = width;
@@ -33,11 +15,8 @@ context.font = `${fontSize}px "Croissant One"`;
 context.textAlign = "center";
 context.textBaseline = "middle";
 context.textRendering = "optimizeLegibility";
-context.fillStyle = "white";
+context.fillStyle = backgroundColor;
 context.fillRect(0, 0, width, height);
-
-const connectingLinesGElement = getById("connectingLines", SVGGElement);
-const lettersGElement = getById("letters", SVGGElement);
 
 const initialContents = [
   ["A", "Z", "Q", "B", "R", "T", "S", "D"],
@@ -76,24 +55,13 @@ function getCenter(columnIndex: number, rowIndex: number, iteration = 0) {
 
 function drawBracket() {
   // Lines for the bracket.
-  context.strokeStyle = "black";
+  context.strokeStyle = "#ccc";
   centers.forEach((column, columnIndex) => {
     const nextColumn = centers[columnIndex + 1];
     if (nextColumn) {
       column.forEach((initialPosition, initialRowIndex) => {
         const finalRowIndex = (initialRowIndex / 2) | 0;
         const finalPosition = nextColumn[finalRowIndex];
-        // SVG
-        const line = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "line"
-        );
-        line.x1.baseVal.value = initialPosition.x;
-        line.y1.baseVal.value = initialPosition.y;
-        line.x2.baseVal.value = finalPosition.x;
-        line.y2.baseVal.value = finalPosition.y;
-        connectingLinesGElement.appendChild(line);
-        // Canvas
         context.moveTo(initialPosition.x, initialPosition.y);
         context.lineTo(finalPosition.x, finalPosition.y);
         context.lineWidth = 10;
@@ -103,22 +71,9 @@ function drawBracket() {
   });
 
   // Empty space to fill in later with the letters.
-  context.fillStyle = "white";
+  context.fillStyle = backgroundColor;
   const radius = width / columnCount / 5;
   centers.flat().forEach(({ x, y }) => {
-    // SVG
-    const circleElement = document.createElementNS(
-      "http://www.w3.org/2000/svg",
-      "circle"
-    );
-    circleElement.cx.baseVal.value = x;
-    circleElement.cy.baseVal.value = y;
-    circleElement.r.baseVal.value = radius;
-    circleElement.style.fill = "white";
-    circleElement.style.stroke = "none";
-    circleElement.style.strokeWidth = lineWidth + "px";
-    connectingLinesGElement.appendChild(circleElement);
-    // Canvas
     context.beginPath();
     context.ellipse(x, y, radius, radius, 0, 0, 2 * Math.PI);
     context.fill();
@@ -128,28 +83,12 @@ function drawBracket() {
 function crossOut(center: { x: number; y: number }, color: string) {
   console.log({ crossOut: 1, center, color });
   const { x, y } = center;
-  const length = fontSize;
-  const width = fontSize / 9;
-  const rectElement = document.createElementNS(
-    "http://www.w3.org/2000/svg",
-    "rect"
-  );
-  rectElement.x.baseVal.value = -width / 2;
-  rectElement.y.baseVal.value = -length / 2;
-  rectElement.width.baseVal.value = width;
-  rectElement.height.baseVal.value = length;
-  rectElement.style.fill = color;
-  rectElement.style.strokeWidth = (fontSize / 30).toString();
-  rectElement.style.stroke = "white";
-  rectElement.style.transform = `translate(${x}px,${y}px)  rotate(-45deg)`;
-  lettersGElement.appendChild(rectElement);
-  // Canvas
   const offset = fontSize * 0.4;
   context.beginPath();
   context.moveTo(x - offset, y - offset);
   context.lineTo(x + offset, y + offset);
   context.lineWidth = 12;
-  context.strokeStyle = "white";
+  context.strokeStyle = backgroundColor;
   context.stroke();
   context.lineWidth = 6.1;
   context.strokeStyle = color;
@@ -162,17 +101,6 @@ function addLetter(
   color: string
 ) {
   console.log({ addLetter: 1, center, text, color });
-  const textElement = document.createElementNS(
-    "http://www.w3.org/2000/svg",
-    "text"
-  );
-  textElement.textContent = text;
-  textElement.setAttribute("x", center.x.toString());
-  textElement.setAttribute("y", center.y.toString());
-  textElement.style.fill = color;
-  lettersGElement.appendChild(textElement);
-
-  // canvas
   context.fillStyle = color;
   context.fillText(text, center.x, center.y);
 }
@@ -238,7 +166,7 @@ function drawInitialLetters(columnIndex: number) {
     centers[columnIndex],
     initialContents[columnIndex]
   )) {
-    addLetter(center, text, "black");
+    addLetter(center, text, "#666");
   }
 }
 
@@ -259,7 +187,7 @@ await replaceOneValue(
     { rowIndex: 0, newText: "Z" },
     { rowIndex: 0 },
   ],
-  "hotpink"
+  "red"
 );
 await replaceOneValue(
   [
@@ -268,7 +196,5 @@ await replaceOneValue(
     { rowIndex: 1, newText: "Q" },
     { rowIndex: 3 },
   ],
-  "lightblue"
+  "blue"
 );
-
-//ffmpeg({});
