@@ -1,6 +1,7 @@
-import { count, makePromise, sleep, zip } from "phil-lib/misc";
 import "./style.css";
-import { getById } from "phil-lib/client-misc";
+import { count, sleep, zip } from "phil-lib/misc";
+import { getBlobFromCanvas, getById } from "phil-lib/client-misc";
+import { downloadZip } from "client-zip";
 
 const width = 1080;
 const height = 1920;
@@ -8,6 +9,9 @@ const fontSize = 75;
 const backgroundColor = "white";
 
 const canvas = getById("main", HTMLCanvasElement);
+//const continueButton = getById("continue", HTMLButtonElement);
+const downloadAnchor = getById("download", HTMLAnchorElement);
+
 canvas.width = width;
 canvas.height = height;
 const context = canvas.getContext("2d")!;
@@ -110,10 +114,11 @@ type ReplaceOneCell = {
   newText?: string;
 };
 
-function takePhoto(timeMs?: number) {
-  console.log(`takePhoto(${timeMs})`);
+const photos: Promise<Blob>[] = [];
+
+function takePhoto() {
+  /*
   const { promise, resolve } = makePromise();
-  const continueButton = getById("continue", HTMLButtonElement);
   continueButton.disabled = false;
   continueButton.addEventListener(
     "click",
@@ -124,6 +129,8 @@ function takePhoto(timeMs?: number) {
     { once: true }
   );
   return promise;
+*/
+  photos.push(getBlobFromCanvas(canvas));
 }
 
 /**
@@ -147,7 +154,7 @@ async function replaceOneValue(
     if (newText) {
       overWrite.unshift({ rowIndex, columnIndex, newText });
     }
-    await takePhoto(1000);
+    await takePhoto();
   }
   for (const { rowIndex, columnIndex, newText } of overWrite) {
     addLetter(
@@ -155,7 +162,7 @@ async function replaceOneValue(
       newText,
       color
     );
-    await takePhoto(1000);
+    await takePhoto();
   }
 }
 
@@ -198,3 +205,13 @@ await replaceOneValue(
   ],
   "blue"
 );
+
+const input = (await Promise.all(photos)).map((blob, index) => ({
+  name: `frame_${index.toString().padStart(4, "0")}.png`,
+  lastModified: new Date(),
+  input: blob,
+}));
+//console.log(input);
+downloadAnchor.href = URL.createObjectURL(await downloadZip(input).blob());
+downloadAnchor.download = "all_png_files.zip";
+downloadAnchor.innerText = "Download";
