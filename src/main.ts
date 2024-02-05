@@ -3,9 +3,32 @@ import { count, sleep, zip } from "phil-lib/misc";
 import { getBlobFromCanvas, getById } from "phil-lib/client-misc";
 import { downloadZip } from "client-zip";
 
+/**
+ *
+ * @param date To convert to a string.
+ * @returns Like the MySQL format, but avoids the colon because that's not valid in a file name.
+ */
+function dateToFileName(date: Date) {
+  if (isNaN(date.getTime())) {
+    return "0000-00-00 00⦂00⦂00";
+  } else {
+    return `${date.getFullYear().toString().padStart(4, "0")}-${(
+      date.getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")} ${date
+      .getHours()
+      .toString()
+      .padStart(2, "0")}⦂${date.getMinutes().toString().padStart(2, "0")}⦂${date
+      .getSeconds()
+      .toString()
+      .padStart(2, "0")}`;
+  }
+}
+
 const width = 1080;
 const height = 1920;
-const fontSize = 75;
+const fontSize = (75 / 1920) * height;
 const backgroundColor = "white";
 
 const canvas = getById("main", HTMLCanvasElement);
@@ -85,7 +108,6 @@ function drawBracket() {
 }
 
 function crossOut(center: { x: number; y: number }, color: string) {
-  console.log({ crossOut: 1, center, color });
   const { x, y } = center;
   const offset = fontSize * 0.4;
   context.beginPath();
@@ -104,7 +126,6 @@ function addLetter(
   text: string,
   color: string
 ) {
-  console.log({ addLetter: 1, center, text, color });
   context.fillStyle = color;
   context.fillText(text, center.x, center.y);
 }
@@ -206,12 +227,12 @@ await replaceOneValue(
   "blue"
 );
 
+const baseDate = dateToFileName(new Date());
 const input = (await Promise.all(photos)).map((blob, index) => ({
-  name: `frame_${index.toString().padStart(4, "0")}.png`,
+  name: `${baseDate} ${index.toString().padStart(4, "0")}.png`,
   lastModified: new Date(),
   input: blob,
 }));
-//console.log(input);
 downloadAnchor.href = URL.createObjectURL(await downloadZip(input).blob());
 downloadAnchor.download = "all_png_files.zip";
 downloadAnchor.innerText = "Download";
