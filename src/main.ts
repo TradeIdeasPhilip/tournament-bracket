@@ -1,7 +1,6 @@
 import "./style.css";
-import { count, sleep, zip } from "phil-lib/misc";
+import { count, makePromise, sleep, zip } from "phil-lib/misc";
 import { getBlobFromCanvas, getById } from "phil-lib/client-misc";
-import { downloadZip } from "client-zip";
 
 /**
  *
@@ -10,13 +9,13 @@ import { downloadZip } from "client-zip";
  */
 function dateToFileName(date: Date) {
   if (isNaN(date.getTime())) {
-    return "0000-00-00 00⦂00⦂00";
+    return "0000⸱00⸱00 00⦂00⦂00";
   } else {
-    return `${date.getFullYear().toString().padStart(4, "0")}-${(
+    return `${date.getFullYear().toString().padStart(4, "0")}⸱${(
       date.getMonth() + 1
     )
       .toString()
-      .padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")} ${date
+      .padStart(2, "0")}⸱${date.getDate().toString().padStart(2, "0")} ${date
       .getHours()
       .toString()
       .padStart(2, "0")}⦂${date.getMinutes().toString().padStart(2, "0")}⦂${date
@@ -32,8 +31,7 @@ const fontSize = (75 / 1920) * height;
 const backgroundColor = "white";
 
 const canvas = getById("main", HTMLCanvasElement);
-//const continueButton = getById("continue", HTMLButtonElement);
-const downloadAnchor = getById("download", HTMLAnchorElement);
+const startButton = getById("start", HTMLButtonElement);
 
 canvas.width = width;
 canvas.height = height;
@@ -135,23 +133,47 @@ type ReplaceOneCell = {
   newText?: string;
 };
 
-const photos: Promise<Blob>[] = [];
+const controls = {
+  saveFrames : false,
+  realtime : false
+};
+(["saveFrames", "realtime"] as const).forEach(name => {
+  const inputElement = getById(name, HTMLInputElement);
+  const copyFromGui = () => controls[name] = inputElement.checked;
+  copyFromGui();
+  inputElement.addEventListener("input", copyFromGui);
+});
 
-function takePhoto() {
-  /*
-  const { promise, resolve } = makePromise();
-  continueButton.disabled = false;
-  continueButton.addEventListener(
-    "click",
-    () => {
-      continueButton.disabled = true;
-      resolve();
-    },
-    { once: true }
-  );
-  return promise;
-*/
-  photos.push(getBlobFromCanvas(canvas));
+const millisecondsPerFrame = 1000 / 60;
+let nextImageIndex = 0;
+function skipFrames(frameCount: number) {
+  if (frameCount < 0) {
+    throw new Error("wtf");
+  }
+  nextImageIndex += (frameCount|0);
+  if (controls.realtime) {
+    return sleep(frameCount * millisecondsPerFrame);
+  } else {
+    return Promise.resolve();
+  }
+}
+
+let baseDate = dateToFileName(new Date());
+const downloadAnchor = document.createElement("a");
+async function takePhoto() {
+  if (controls.saveFrames) {
+    downloadAnchor.download = `${baseDate} ${(nextImageIndex++)
+      .toString()
+      .padStart(4, "0")}.png`;
+    const blob = await getBlobFromCanvas(canvas);
+    const url = URL.createObjectURL(blob);
+    downloadAnchor.href = url;
+    downloadAnchor.click();
+    URL.revokeObjectURL(url);  
+  }
+  if (controls.realtime) {
+    await sleep(millisecondsPerFrame);
+  }
 }
 
 /**
@@ -176,6 +198,7 @@ async function replaceOneValue(
       overWrite.unshift({ rowIndex, columnIndex, newText });
     }
     await takePhoto();
+    await skipFrames(250 / millisecondsPerFrame);
   }
   for (const { rowIndex, columnIndex, newText } of overWrite) {
     addLetter(
@@ -184,10 +207,9 @@ async function replaceOneValue(
       color
     );
     await takePhoto();
+    await skipFrames(500 / millisecondsPerFrame);
   }
 }
-
-(window as any).replaceOneValue = replaceOneValue;
 
 function drawInitialLetters(columnIndex: number) {
   for (const [center, text] of zip(
@@ -198,14 +220,28 @@ function drawInitialLetters(columnIndex: number) {
   }
 }
 
-await sleep(1000);
+{
+  const promise = makePromise();
+  startButton.addEventListener(
+    "click",
+    () => {
+      baseDate = dateToFileName(new Date());
+      startButton.disabled = true;
+      promise.resolve();
+    },
+    { once: true }
+  );
+  await promise.promise;
+}
 
 drawInitialLetters(0);
 await takePhoto();
+await skipFrames(1000 / millisecondsPerFrame);
 drawBracket();
 for (const columnIndex of count(0, columnCount)) {
   drawInitialLetters(columnIndex);
   await takePhoto();
+  await skipFrames(750 / millisecondsPerFrame);
 }
 
 await replaceOneValue(
@@ -226,13 +262,3 @@ await replaceOneValue(
   ],
   "blue"
 );
-
-const baseDate = dateToFileName(new Date());
-const input = (await Promise.all(photos)).map((blob, index) => ({
-  name: `${baseDate} ${index.toString().padStart(4, "0")}.png`,
-  lastModified: new Date(),
-  input: blob,
-}));
-downloadAnchor.href = URL.createObjectURL(await downloadZip(input).blob());
-downloadAnchor.download = "all_png_files.zip";
-downloadAnchor.innerText = "Download";
