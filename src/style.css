@@ -16,5 +16,4 @@ body {
 canvas#main {
   max-height: 100vmin;
   max-width: 100vmin;
-  background-color: white;
 }

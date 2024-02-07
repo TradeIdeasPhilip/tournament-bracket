@@ -29,6 +29,7 @@ const width = 1080;
 const height = 1920;
 const fontSize = (75 / 1920) * height;
 const backgroundColor = "white";
+const initialLetterColor = "#666";
 
 const canvas = getById("main", HTMLCanvasElement);
 const startButton = getById("start", HTMLButtonElement);
@@ -36,7 +37,10 @@ const startButton = getById("start", HTMLButtonElement);
 canvas.width = width;
 canvas.height = height;
 const context = canvas.getContext("2d")!;
-context.font = `${fontSize}px "Croissant One"`;
+const setFontSize = (newValue = fontSize) => {
+  context.font = `${newValue}px "Croissant One"`;
+};
+setFontSize();
 context.textAlign = "center";
 context.textBaseline = "middle";
 context.textRendering = "optimizeLegibility";
@@ -44,7 +48,7 @@ context.fillStyle = backgroundColor;
 context.fillRect(0, 0, width, height);
 
 const initialContents = [
-  ["A", "Z", "Q", "B", "R", "T", "S", "D"],
+  ["Z", "A", "Q", "B", "R", "T", "S", "D"],
   ["A", "B", "R", "D"],
   ["A", "D"],
   ["A"],
@@ -53,13 +57,50 @@ const currentIteration = initialContents.map((column) => column.map(() => 0));
 const columnCount = initialContents.length;
 const lineWidth = width / columnCount / 25;
 
+const reservedOnTop = 1;
+const clientTop =
+  (reservedOnTop / (reservedOnTop + initialContents[0].length)) * height;
+const clientHeight = height - clientTop;
 const centers = initialContents.map((columnValues, columnIndex) => {
   const x = (width / columnCount) * (columnIndex + 0.5);
   return columnValues.map((_, rowIndex) => {
-    const y = (height / columnValues.length) * (rowIndex + 0.5);
+    const y =
+      clientTop + (clientHeight / columnValues.length) * (rowIndex + 0.5);
     const center = { x, y };
     return center;
   });
+});
+
+[...initialContents[0]].sort().forEach((text, columnIndex, array) => {
+  const x = (width / array.length) * (columnIndex + 0.5);
+  const y = clientTop / 2;
+
+  context.fillStyle =
+    [initialLetterColor, "red", "blue", "green", "#CC5500", "#800080", "lime"][
+      columnIndex
+    ] ?? "black";
+  context.fillText(text, x, y);
+
+  const ordinalLeft = (columnIndex + 1).toString();
+  const ordinalRight = ["st", "nd", "rd"][columnIndex] ?? "th";
+  const sizeLeft = fontSize * 0.667;
+  const sizeRight = fontSize * 0.42;
+  setFontSize(sizeLeft);
+  const metricsLeft = context.measureText(ordinalLeft);
+  setFontSize(sizeRight);
+  const metricsRight = context.measureText(ordinalRight);
+  const ordinalWidth = metricsLeft.width + metricsRight.width;
+  const ordinalFarLeft = x - ordinalWidth / 2;
+  const ordinalLeftX = ordinalFarLeft + metricsLeft.width / 2;
+  const ordinalRightX = ordinalLeftX + ordinalWidth / 2;
+
+  setFontSize(sizeLeft);
+  context.fillText(ordinalLeft, ordinalLeftX, y + fontSize);
+
+  setFontSize(sizeRight);
+  context.fillText(ordinalRight, ordinalRightX, y + fontSize * 0.9);
+
+  setFontSize();
 });
 
 function getCenter(columnIndex: number, rowIndex: number, iteration = 0) {
@@ -134,12 +175,12 @@ type ReplaceOneCell = {
 };
 
 const controls = {
-  saveFrames : false,
-  realtime : false
+  saveFrames: false,
+  realtime: false,
 };
-(["saveFrames", "realtime"] as const).forEach(name => {
+(["saveFrames", "realtime"] as const).forEach((name) => {
   const inputElement = getById(name, HTMLInputElement);
-  const copyFromGui = () => controls[name] = inputElement.checked;
+  const copyFromGui = () => (controls[name] = inputElement.checked);
   copyFromGui();
   inputElement.addEventListener("input", copyFromGui);
 });
@@ -150,7 +191,7 @@ function skipFrames(frameCount: number) {
   if (frameCount < 0) {
     throw new Error("wtf");
   }
-  nextImageIndex += (frameCount|0);
+  nextImageIndex += frameCount | 0;
   if (controls.realtime) {
     return sleep(frameCount * millisecondsPerFrame);
   } else {
@@ -169,7 +210,7 @@ async function takePhoto() {
     const url = URL.createObjectURL(blob);
     downloadAnchor.href = url;
     downloadAnchor.click();
-    URL.revokeObjectURL(url);  
+    URL.revokeObjectURL(url);
   }
   if (controls.realtime) {
     await sleep(millisecondsPerFrame);
@@ -216,7 +257,7 @@ function drawInitialLetters(columnIndex: number) {
     centers[columnIndex],
     initialContents[columnIndex]
   )) {
-    addLetter(center, text, "#666");
+    addLetter(center, text, initialLetterColor);
   }
 }
 
@@ -249,7 +290,7 @@ await replaceOneValue(
     { rowIndex: 0, newText: "B" },
     { rowIndex: 0, newText: "B" },
     { rowIndex: 0, newText: "Z" },
-    { rowIndex: 0 },
+    { rowIndex: 1 },
   ],
   "red"
 );
@@ -261,4 +302,9 @@ await replaceOneValue(
     { rowIndex: 3 },
   ],
   "blue"
+);
+console.log(
+  `Total run time:  ${(
+    nextImageIndex * millisecondsPerFrame
+  ).toLocaleString()} ms.`
 );
