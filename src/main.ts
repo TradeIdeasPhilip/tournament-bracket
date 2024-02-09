@@ -33,6 +33,7 @@ const initialLetterColor = "#666";
 
 const canvas = getById("main", HTMLCanvasElement);
 const startButton = getById("start", HTMLButtonElement);
+const voiceoverControl = getById("voiceover", HTMLAudioElement);
 
 canvas.width = width;
 canvas.height = height;
@@ -71,14 +72,11 @@ const centers = initialContents.map((columnValues, columnIndex) => {
   });
 });
 
-[...initialContents[0]].sort().forEach((text, columnIndex, array) => {
-  const x = (width / array.length) * (columnIndex + 0.5);
+function drawFinalResult(text: string, columnIndex: number, color: string) {
+  const x = (width / initialContents[0].length) * (columnIndex + 0.5);
   const y = clientTop / 2;
 
-  context.fillStyle =
-    [initialLetterColor, "red", "blue", "green", "#CC5500", "#800080", "lime"][
-      columnIndex
-    ] ?? "black";
+  context.fillStyle = color;
   context.fillText(text, x, y);
 
   const ordinalLeft = (columnIndex + 1).toString();
@@ -101,7 +99,15 @@ const centers = initialContents.map((columnValues, columnIndex) => {
   context.fillText(ordinalRight, ordinalRightX, y + fontSize * 0.9);
 
   setFontSize();
-});
+}
+
+// [...initialContents[0]].sort().forEach((text, columnIndex) => {
+//   const color =
+//     [initialLetterColor, "red", "blue", "green", "#CC5500", "#800080", "lime"][
+//       columnIndex
+//     ] ?? "black";
+//   drawFinalResult(text, columnIndex, color);
+// });
 
 function getCenter(columnIndex: number, rowIndex: number, iteration = 0) {
   const { x, y } = centers[columnIndex][rowIndex];
@@ -193,10 +199,23 @@ function skipFrames(frameCount: number) {
   }
   nextImageIndex += frameCount | 0;
   if (controls.realtime) {
-    return sleep(frameCount * millisecondsPerFrame);
+    const desiredWakeTimeMs = nextImageIndex * millisecondsPerFrame;
+    const currentTimeMs = voiceoverControl.currentTime * 1000;
+    return sleep(desiredWakeTimeMs - currentTimeMs);
   } else {
     return Promise.resolve();
   }
+}
+function skipToMs(timeFromStartInMs: number) {
+  return skipFrames(framesUntilTime(timeFromStartInMs));
+}
+function framesUntilTime(timeFromStartInMs: number) {
+  const finalFrame = (timeFromStartInMs / millisecondsPerFrame) | 0;
+  const remaining = finalFrame - nextImageIndex;
+  if (remaining < 0) {
+    throw new Error("wtf");
+  }
+  return remaining;
 }
 
 let baseDate = dateToFileName(new Date());
@@ -217,14 +236,48 @@ async function takePhoto() {
   }
 }
 
+function makePhotoTimer(
+  startMs: number,
+  endMs: number,
+  count: number,
+  pause: "start" | "end" | "both" | "neither"
+) {
+  const pauseBefore = pause == "start" || pause == "both";
+  const pauseAfter = pause == "end" || pause == "both";
+  const pauses = (() => {
+    let pauses = count - 1;
+    if (pauseBefore) pauses++;
+    if (pauseAfter) pauses++;
+    return pauses;
+  })();
+  const pauseMs = (endMs - startMs) / pauses;
+  const firstMs = startMs + (pauseBefore ? pauseMs : 0);
+  let photosTaken = 0;
+  async function takeNextPhoto() {
+    if (photosTaken >= count) {
+      throw new Error("wtf");
+    }
+    const time = firstMs + pauseMs * photosTaken;
+    await skipToMs(time);
+    await takePhoto();
+    photosTaken++;
+  }
+  return takeNextPhoto;
+}
+
 /**
  *
  * @param cells Index 0 maps to the root of the tree.  Index 1 maps to one column left of the root.
  */
 async function replaceOneValue(
   cells: readonly ReplaceOneCell[],
-  color: string
+  color: string,
+  topRowPosition: number,
+  startTime: number,
+  midTime: number,
+  endTime: number
 ) {
+  let takeNextPhoto = makePhotoTimer(startTime, midTime, cells.length, "end");
   let columnIndex = columnCount;
   const overWrite: {
     rowIndex: number;
@@ -238,16 +291,20 @@ async function replaceOneValue(
     if (newText) {
       overWrite.unshift({ rowIndex, columnIndex, newText });
     }
-    await takePhoto();
-    await skipFrames(250 / millisecondsPerFrame);
+    await takeNextPhoto();
   }
+  takeNextPhoto = makePhotoTimer(midTime, endTime, overWrite.length, "end");
   for (const { rowIndex, columnIndex, newText } of overWrite) {
     addLetter(
       getCenter(columnIndex, rowIndex, currentIteration[columnIndex][rowIndex]),
       newText,
       color
     );
-    await takePhoto();
+    await takeNextPhoto();
+  }
+  const { newText } = cells[0];
+  if (newText) {
+    drawFinalResult(newText, topRowPosition, color);
     await skipFrames(500 / millisecondsPerFrame);
   }
 }
@@ -275,34 +332,87 @@ function drawInitialLetters(columnIndex: number) {
   await promise.promise;
 }
 
-drawInitialLetters(0);
-await takePhoto();
-await skipFrames(1000 / millisecondsPerFrame);
-drawBracket();
-for (const columnIndex of count(0, columnCount)) {
-  drawInitialLetters(columnIndex);
-  await takePhoto();
-  await skipFrames(750 / millisecondsPerFrame);
+if (controls.realtime) {
+  voiceoverControl.play();
 }
 
-await replaceOneValue(
-  [
-    { rowIndex: 0, newText: "B" },
-    { rowIndex: 0, newText: "B" },
-    { rowIndex: 0, newText: "Z" },
-    { rowIndex: 1 },
-  ],
-  "red"
-);
-await replaceOneValue(
-  [
-    { rowIndex: 0, newText: "D" },
-    { rowIndex: 0, newText: "Q" },
-    { rowIndex: 1, newText: "Q" },
-    { rowIndex: 3 },
-  ],
-  "blue"
-);
+{
+  // ❝You know how to find the best item in a list❞
+  drawInitialLetters(0);
+  await takePhoto();
+  await skipToMs(2200);
+  drawFinalResult("", 0, initialLetterColor);
+  await skipToMs(3750);
+}
+
+{
+  // ❝That's just a standard tournament bracket.❞
+  const startTime = 3750;
+  const endTime = 6500;
+  await skipToMs(startTime);
+  const takeNextPhoto = makePhotoTimer(
+    startTime,
+    endTime,
+    columnCount + 1,
+    "both"
+  );
+  async (n: number) => {
+    const denominator = columnCount + 2;
+    const pausePerPhoto = (endTime - startTime) / denominator;
+    await skipToMs(startTime + (n + 1) * pausePerPhoto);
+    takePhoto();
+  };
+  drawBracket();
+  for (const columnIndex of count(0, columnCount)) {
+    drawInitialLetters(columnIndex);
+    await takeNextPhoto();
+  }
+  drawFinalResult(initialContents[columnCount - 1][0], 0, initialLetterColor);
+  await takeNextPhoto();
+  await skipToMs(endTime);
+}
+
+{
+  // ❝But what about second place?❞
+  await skipToMs(8000);
+  drawFinalResult("", 1, "red");
+}
+
+// ❝Don't start from scratch❞
+
+{
+  // ❝Remove the winner❞
+  // ❝Then fill in the missing holes.❞
+  await replaceOneValue(
+    [
+      { rowIndex: 0, newText: "B" },
+      { rowIndex: 0, newText: "B" },
+      { rowIndex: 0, newText: "Z" },
+      { rowIndex: 1 },
+    ],
+    "red",
+    1,
+    12000,
+    13750,
+    16500
+  );
+}
+
+{
+  await replaceOneValue(
+    [
+      { rowIndex: 0, newText: "D" },
+      { rowIndex: 0, newText: "Q" },
+      { rowIndex: 1, newText: "Q" },
+      { rowIndex: 3 },
+    ],
+    "blue",
+    2,
+    16500,
+    16500 + 1750,
+    16500 + 4500
+  );
+}
 console.log(
   `Total run time:  ${(
     nextImageIndex * millisecondsPerFrame

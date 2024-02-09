@@ -8,12 +8,20 @@
   </head>
   <body>
     <canvas id="main"></canvas>
-    <div style="margin-left: 0.5em">
-      <input type="checkbox" id="saveFrames" />
-      <label for="saveFrames">Save Frames&nbsp;</label>
-      <input type="checkbox" id="realtime" checked />
-      <label for="realtime">Realtime&nbsp;&nbsp;</label>
-      <button id="start">Start</button>
+    <div style="margin: 0.5em; flex: 1">
+      <div>
+        <input type="checkbox" id="saveFrames" />
+        <label for="saveFrames">Save Frames&nbsp;</label>
+        <input type="checkbox" id="realtime" checked />
+        <label for="realtime">Realtime&nbsp;&nbsp;</label>
+        <button id="start">Start</button>
+      </div>
+      <audio
+        style="margin-top: 0.5em; width: 100%; display: block"
+        id="voiceover"
+        controls
+        src="./src/voiceover.m4a"
+      ></audio>
     </div>
   </body>
 </html>
