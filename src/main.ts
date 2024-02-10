@@ -1,5 +1,5 @@
 import "./style.css";
-import { count, makePromise, sleep, zip } from "phil-lib/misc";
+import { assertClass, count, makePromise, sleep, zip } from "phil-lib/misc";
 import { getBlobFromCanvas, getById } from "phil-lib/client-misc";
 
 /**
@@ -56,7 +56,6 @@ const initialContents = [
 ];
 const currentIteration = initialContents.map((column) => column.map(() => 0));
 const columnCount = initialContents.length;
-const lineWidth = width / columnCount / 25;
 
 const reservedOnTop = 1;
 const clientTop =
@@ -76,6 +75,13 @@ function drawFinalResult(text: string, columnIndex: number, color: string) {
   const x = (width / initialContents[0].length) * (columnIndex + 0.5);
   const y = clientTop / 2;
 
+  context.fillStyle = backgroundColor;
+  context.fillRect(
+    x - fontSize * 0.6,
+    y - fontSize * 0.6,
+    fontSize * 1.2,
+    fontSize * 1.1
+  );
   context.fillStyle = color;
   context.fillText(text, x, y);
 
@@ -182,14 +188,11 @@ type ReplaceOneCell = {
 
 const controls = {
   saveFrames: false,
-  realtime: false,
+  /**
+   * speed = slowness⁻¹
+   */
+  slowness: 0,
 };
-(["saveFrames", "realtime"] as const).forEach((name) => {
-  const inputElement = getById(name, HTMLInputElement);
-  const copyFromGui = () => (controls[name] = inputElement.checked);
-  copyFromGui();
-  inputElement.addEventListener("input", copyFromGui);
-});
 
 const millisecondsPerFrame = 1000 / 60;
 let nextImageIndex = 0;
@@ -198,10 +201,10 @@ function skipFrames(frameCount: number) {
     throw new Error("wtf");
   }
   nextImageIndex += frameCount | 0;
-  if (controls.realtime) {
+  if (controls.slowness) {
     const desiredWakeTimeMs = nextImageIndex * millisecondsPerFrame;
     const currentTimeMs = voiceoverControl.currentTime * 1000;
-    return sleep(desiredWakeTimeMs - currentTimeMs);
+    return sleep((desiredWakeTimeMs - currentTimeMs) * controls.slowness);
   } else {
     return Promise.resolve();
   }
@@ -231,8 +234,8 @@ async function takePhoto() {
     downloadAnchor.click();
     URL.revokeObjectURL(url);
   }
-  if (controls.realtime) {
-    await sleep(millisecondsPerFrame);
+  if (controls.slowness) {
+    await sleep(millisecondsPerFrame * controls.slowness);
   }
 }
 
@@ -324,6 +327,10 @@ function drawInitialLetters(columnIndex: number) {
     "click",
     () => {
       baseDate = dateToFileName(new Date());
+      document.querySelectorAll("input").forEach((inputElement) => {
+        if (inputElement.type != "radio" || !inputElement.checked)
+          inputElement.disabled = true;
+      });
       startButton.disabled = true;
       promise.resolve();
     },
@@ -332,7 +339,21 @@ function drawInitialLetters(columnIndex: number) {
   await promise.promise;
 }
 
-if (controls.realtime) {
+controls.saveFrames = getById("saveFrames", HTMLInputElement).checked;
+
+{
+  const asString = assertClass(
+    document.querySelector('[name="speed"]:checked'),
+    HTMLElement
+  ).dataset.slowness;
+  if (asString === undefined) {
+    throw new Error("wtf");
+  }
+  controls.slowness = +asString;
+}
+
+if (controls.slowness) {
+  voiceoverControl.playbackRate = 1 / controls.slowness;
   voiceoverControl.play();
 }
 
@@ -341,7 +362,7 @@ if (controls.realtime) {
   drawInitialLetters(0);
   await takePhoto();
   await skipToMs(2200);
-  drawFinalResult("", 0, initialLetterColor);
+  drawFinalResult("??", 0, initialLetterColor);
   await skipToMs(3750);
 }
 
@@ -375,7 +396,7 @@ if (controls.realtime) {
 {
   // ❝But what about second place?❞
   await skipToMs(8000);
-  drawFinalResult("", 1, "red");
+  drawFinalResult("??", 1, "red");
 }
 
 // ❝Don't start from scratch❞

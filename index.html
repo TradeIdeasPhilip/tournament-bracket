@@ -12,9 +12,30 @@
       <div>
         <input type="checkbox" id="saveFrames" />
         <label for="saveFrames">Save Frames&nbsp;</label>
-        <input type="checkbox" id="realtime" checked />
+        <br />
+        <br />
+        <input name="speed" type="radio" id="fullSpeed" data-slowness="0" />
+        <label for="fullSpeed">Full Speed&nbsp;&nbsp;</label>
+        <br />
+        <input
+          name="speed"
+          type="radio"
+          id="realtime"
+          checked
+          data-slowness="1"
+        />
         <label for="realtime">Realtime&nbsp;&nbsp;</label>
+        <br />
+        <input name="speed" type="radio" id="halfSpeed" data-slowness="2" />
+        <label for="halfSpeed">Half Speed&nbsp;&nbsp;</label>
+        <br />
+        <input name="speed" type="radio" id="quarterSpeed" data-slowness="4" />
+        <label for="quarterSpeed">Quarter Speed&nbsp;&nbsp;</label>
+        <br />
+        <br />
         <button id="start">Start</button>
+        <br />
+        <br />
       </div>
       <audio
         style="margin-top: 0.5em; width: 100%; display: block"
